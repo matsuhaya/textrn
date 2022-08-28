@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 )
 
 var (
 	command = "code -w" // "code" needs waiting for the files to be closed before returning.
+	rootdir = "."
 	tempdir = "."
 )
 
@@ -21,9 +21,13 @@ func main() {
 }
 
 func run() error {
-	fis, err := ls()
+	files, err := listFiles()
 	if err != nil {
 		return err
+	}
+	if len(files) == 0 {
+		fmt.Println("no files")
+		return nil
 	}
 
 	tempFile, err := os.CreateTemp(tempdir, "textrn-")
@@ -31,11 +35,9 @@ func run() error {
 		return err
 	}
 	defer os.Remove(tempFile.Name())
-	for _, fi := range fis {
-		_, err = tempFile.Write([]byte(fmt.Sprintln(fi.Name())))
-		if err != nil {
-			return err
-		}
+
+	for _, f := range files {
+		fmt.Fprintln(tempFile, f)
 	}
 
 	command += " " + tempFile.Name()
@@ -47,17 +49,17 @@ func run() error {
 	return nil
 }
 
-func ls() ([]fs.DirEntry, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, err
+// except for directories
+func listFiles() ([]string, error) {
+	var fileNames []string
+	files, _ := os.ReadDir(rootdir)
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		fileNames = append(fileNames, f.Name())
 	}
-
-	fis, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	return fis, nil
+	return fileNames, nil
 }
 
 func openEditor(command string) error {
