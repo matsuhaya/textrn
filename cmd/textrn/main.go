@@ -48,17 +48,9 @@ func run() error {
 		return err
 	}
 
-	tempFile.Seek(0, 0)
-	var newFiles []string
-	usedName := make(map[string]bool)
-	scanner := bufio.NewScanner(tempFile)
-	for scanner.Scan() {
-		newFileName := scanner.Text()
-		if usedName[newFileName] {
-			return errors.New("duplicate file name specified")
-		}
-		usedName[newFileName] = true
-		newFiles = append(newFiles, newFileName)
+	newFiles, err := scanTempFile(tempFile.Name())
+	if err != nil {
+		return err
 	}
 
 	err = renameFiles(files, newFiles)
@@ -88,6 +80,28 @@ func openEditor(command string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func scanTempFile(tempFileName string) ([]string, error) {
+	// os.Open used because file seek reset doesn't read tempFile by 'vim'.
+	tempFile, err := os.Open(tempFileName)
+	if err != nil {
+		return nil, err
+	}
+	defer tempFile.Close()
+
+	var newFiles []string
+	usedName := make(map[string]bool)
+	scanner := bufio.NewScanner(tempFile)
+	for scanner.Scan() {
+		newFileName := scanner.Text()
+		if usedName[newFileName] {
+			return nil, errors.New("duplicate file name specified")
+		}
+		usedName[newFileName] = true
+		newFiles = append(newFiles, newFileName)
+	}
+	return newFiles, nil
 }
 
 func renameFiles(oldFiles, newFiles []string) error {
