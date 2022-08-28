@@ -2,7 +2,14 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"os/exec"
+)
+
+var (
+	command = "code -w" // "code" needs waiting for the files to be closed before returning.
+	tempdir = "."
 )
 
 func main() {
@@ -14,27 +21,49 @@ func main() {
 }
 
 func run() error {
-	err := ls()
+	fis, err := ls()
 	if err != nil {
 		return err
 	}
+
+	tempFile, err := os.CreateTemp(tempdir, "textrn-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tempFile.Name())
+	for _, fi := range fis {
+		_, err = tempFile.Write([]byte(fmt.Sprintln(fi.Name())))
+		if err != nil {
+			return err
+		}
+	}
+
+	command += " " + tempFile.Name()
+	err = openEditor(command)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func ls() error {
+func ls() ([]fs.DirEntry, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	fis, err := os.ReadDir(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return fis, nil
+}
 
-	for _, fi := range fis {
-		fmt.Println(fi.Name())
-	}
-
-	return nil
+func openEditor(command string) error {
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
