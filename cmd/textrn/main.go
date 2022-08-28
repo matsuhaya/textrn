@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +28,7 @@ func run() error {
 		return err
 	}
 	if len(files) == 0 {
-		fmt.Println("no files")
+		fmt.Fprintf(os.Stdout, "No files")
 		return nil
 	}
 
@@ -42,6 +44,18 @@ func run() error {
 
 	command += " " + tempFile.Name()
 	err = openEditor(command)
+	if err != nil {
+		return err
+	}
+
+	tempFile.Seek(0, 0)
+	var newFiles []string
+	scanner := bufio.NewScanner(tempFile)
+	for scanner.Scan() {
+		newFiles = append(newFiles, scanner.Text())
+	}
+
+	err = renameFiles(files, newFiles)
 	if err != nil {
 		return err
 	}
@@ -68,4 +82,16 @@ func openEditor(command string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// TODO: add to check duplicate new file names
+func renameFiles(oldFiles, newFiles []string) error {
+	if len(oldFiles) != len(newFiles) {
+		return errors.New("the number of new and old files must match")
+	}
+
+	for i, f := range oldFiles {
+		os.Rename(f, newFiles[i])
+	}
+	return nil
 }
