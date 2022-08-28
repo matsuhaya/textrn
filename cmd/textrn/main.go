@@ -50,9 +50,15 @@ func run() error {
 
 	tempFile.Seek(0, 0)
 	var newFiles []string
+	usedName := make(map[string]bool)
 	scanner := bufio.NewScanner(tempFile)
 	for scanner.Scan() {
-		newFiles = append(newFiles, scanner.Text())
+		newFileName := scanner.Text()
+		if usedName[newFileName] {
+			return errors.New("duplicate file name specified")
+		}
+		usedName[newFileName] = true
+		newFiles = append(newFiles, newFileName)
 	}
 
 	err = renameFiles(files, newFiles)
@@ -84,7 +90,6 @@ func openEditor(command string) error {
 	return cmd.Run()
 }
 
-// TODO: add to check duplicate new file names
 func renameFiles(oldFiles, newFiles []string) error {
 	if len(oldFiles) != len(newFiles) {
 		return errors.New("the number of new and old files must match")
