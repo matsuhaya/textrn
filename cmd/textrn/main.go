@@ -23,11 +23,11 @@ func main() {
 }
 
 func run() error {
-	files, err := listFiles()
+	fileNames, err := listFiles()
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
+	if len(fileNames) == 0 {
 		fmt.Fprintf(os.Stdout, "No files")
 		return nil
 	}
@@ -38,8 +38,10 @@ func run() error {
 	}
 	defer os.Remove(tempFile.Name())
 
-	for _, f := range files {
-		fmt.Fprintln(tempFile, f)
+	usedOldName := make(map[string]bool)
+	for _, fn := range fileNames {
+		fmt.Fprintln(tempFile, fn)
+		usedOldName[fn] = true
 	}
 
 	command += " " + tempFile.Name()
@@ -48,12 +50,12 @@ func run() error {
 		return err
 	}
 
-	newFiles, err := scanTempFile(tempFile.Name())
+	newFileNames, err := scanTempFile(tempFile.Name(), usedOldName)
 	if err != nil {
 		return err
 	}
 
-	err = renameFiles(files, newFiles)
+	err = renameFiles(fileNames, newFileNames)
 	if err != nil {
 		return err
 	}
@@ -82,7 +84,7 @@ func openEditor(command string) error {
 	return cmd.Run()
 }
 
-func scanTempFile(tempFileName string) ([]string, error) {
+func scanTempFile(tempFileName string, usedOldName map[string]bool) ([]string, error) {
 	// os.Open used because file seek reset doesn't read tempFile by 'vim'.
 	tempFile, err := os.Open(tempFileName)
 	if err != nil {
@@ -91,14 +93,16 @@ func scanTempFile(tempFileName string) ([]string, error) {
 	defer tempFile.Close()
 
 	var newFiles []string
-	usedName := make(map[string]bool)
+	usedNewName := make(map[string]bool)
 	scanner := bufio.NewScanner(tempFile)
 	for scanner.Scan() {
 		newFileName := scanner.Text()
-		if usedName[newFileName] {
+		if usedNewName[newFileName] {
 			return nil, errors.New("duplicate file name specified")
+		} else if usedOldName[newFileName] {
+			return nil, errors.New("can not rename to the current used file name")
 		}
-		usedName[newFileName] = true
+		usedNewName[newFileName] = true
 		newFiles = append(newFiles, newFileName)
 	}
 	return newFiles, nil
