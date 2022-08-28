@@ -100,7 +100,7 @@ func scanTempFile(tempFileName string, usedOldName map[string]bool) ([]string, e
 		if usedNewName[newFileName] {
 			return nil, errors.New("duplicate file name specified")
 		} else if usedOldName[newFileName] {
-			return nil, errors.New("can not rename to the current used file name")
+			return nil, errors.New("can not rename to the current used file or directly name")
 		}
 		usedNewName[newFileName] = true
 		newFiles = append(newFiles, newFileName)
