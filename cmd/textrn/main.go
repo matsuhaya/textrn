@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 var (
@@ -38,10 +41,10 @@ func run() error {
 	}
 	defer os.Remove(tempFile.Name())
 
-	usedOldName := make(map[string]bool)
-	for _, fn := range fileNames {
+	usedOldName := make(map[string]int)
+	for i, fn := range fileNames {
 		fmt.Fprintln(tempFile, fn)
-		usedOldName[fn] = true
+		usedOldName[fn] = i
 	}
 
 	command += " " + tempFile.Name()
@@ -50,7 +53,12 @@ func run() error {
 		return err
 	}
 
-	newFileNames, err := scanTempFile(tempFile.Name(), usedOldName)
+	newFileNames, usedNewName, err := scanTempFile(tempFile.Name())
+	if err != nil {
+		return err
+	}
+
+	fileNames, newFileNames, err = replaceUsedFileNameToUniq(&fileNames, &newFileNames, usedOldName, usedNewName)
 	if err != nil {
 		return err
 	}
@@ -84,11 +92,11 @@ func openEditor(command string) error {
 	return cmd.Run()
 }
 
-func scanTempFile(tempFileName string, usedOldName map[string]bool) ([]string, error) {
+func scanTempFile(tempFileName string) ([]string, map[string]bool, error) {
 	// os.Open used because file seek reset doesn't read tempFile by 'vim'.
 	tempFile, err := os.Open(tempFileName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer tempFile.Close()
 
@@ -98,14 +106,55 @@ func scanTempFile(tempFileName string, usedOldName map[string]bool) ([]string, e
 	for scanner.Scan() {
 		newFileName := scanner.Text()
 		if usedNewName[newFileName] {
-			return nil, errors.New("duplicate file name specified")
-		} else if usedOldName[newFileName] {
-			return nil, errors.New("can not rename to the current used file or directly name")
+			return nil, nil, errors.New("duplicate file name specified")
 		}
 		usedNewName[newFileName] = true
 		newFiles = append(newFiles, newFileName)
 	}
-	return newFiles, nil
+	return newFiles, usedNewName, nil
+}
+
+// if newFileName was used old filename, replace uniq temp file name.
+// after that, add new rename list "temp -> newFileName".
+// ex.)
+// before:
+// a						->	b
+// b						->	c
+//
+// after:
+// a						->	temp-123456
+// b						->	c
+// temp-123456	->	b
+func replaceUsedFileNameToUniq(oldFileNames, newFileNames *[]string, usedOldName map[string]int, usedNewName map[string]bool) ([]string, []string, error) {
+	for newIndex, newFileName := range *newFileNames {
+		if oldIndex, ok := usedOldName[newFileName]; ok && newIndex < oldIndex {
+			var tempFineName string
+			isUniq := false
+			for i := 0; i < 1000; i++ {
+				tempFineName = genTempFileName("temp-")
+				if _, ok := usedOldName[tempFineName]; !ok && !usedNewName[tempFineName] {
+					isUniq = true
+				}
+				if isUniq {
+					break
+				}
+			}
+			if !isUniq {
+				return nil, nil, errors.New("failed to generate uniq file name")
+			}
+
+			(*newFileNames)[newIndex] = tempFineName
+			*oldFileNames = append(*oldFileNames, tempFineName)
+			*newFileNames = append(*newFileNames, newFileName)
+		}
+	}
+	return *oldFileNames, *newFileNames, nil
+}
+
+func genTempFileName(prefix string) string {
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+	return prefix + hex.EncodeToString(randBytes)
 }
 
 func renameFiles(oldFiles, newFiles []string) error {
@@ -114,7 +163,7 @@ func renameFiles(oldFiles, newFiles []string) error {
 	}
 
 	for i, f := range oldFiles {
-		os.Rename(f, newFiles[i])
+		os.Rename(filepath.Join(rootdir, f), filepath.Join(rootdir, newFiles[i]))
 	}
 	return nil
 }
