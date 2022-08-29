@@ -163,7 +163,10 @@ func renameFiles(oldFiles, newFiles []string) error {
 	}
 
 	for i, f := range oldFiles {
-		os.Rename(filepath.Join(rootdir, f), filepath.Join(rootdir, newFiles[i]))
+		err := os.Rename(filepath.Join(rootdir, f), filepath.Join(rootdir, newFiles[i]))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
