@@ -1,6 +1,6 @@
 # textrn
 
-rename multiple files by editor
+rename multiple files with editor
 
 ## Usage
 
@@ -17,7 +17,7 @@ Change directory containing files you want to rename.
 textrn
 ```
 
-Rename multiple files by your favorite editor.
+Rename multiple files with your favorite editor.
 
 ```
 aaa_20220101.txt
