@@ -9,11 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 var (
-	command = "code -w" // "code" needs waiting for the files to be closed before returning.
-	rootdir = "./test"
+	rootdir = "."
 	tempdir = "."
 )
 
@@ -47,8 +47,13 @@ func run() error {
 		usedOldName[fn] = i
 	}
 
-	command += " " + tempFile.Name()
-	err = openEditor(command)
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "vi"
+	}
+	commands := strings.Fields(editor)
+	commands = append(commands, tempFile.Name())
+	err = openEditor(commands)
 	if err != nil {
 		return err
 	}
@@ -84,7 +89,8 @@ func listFiles() ([]string, error) {
 	return fileNames, nil
 }
 
-func openEditor(command string) error {
+func openEditor(commands []string) error {
+	command := strings.Join(commands, " ")
 	cmd := exec.Command("sh", "-c", command)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
