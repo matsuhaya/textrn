@@ -13,7 +13,7 @@ import (
 
 var (
 	command = "code -w" // "code" needs waiting for the files to be closed before returning.
-	rootdir = "."
+	rootdir = "./test"
 	tempdir = "."
 )
 
@@ -58,7 +58,7 @@ func run() error {
 		return err
 	}
 
-	fileNames, newFileNames, err = replaceUsedFileNameToUniq(&fileNames, &newFileNames, usedOldName, usedNewName)
+	err = replaceUsedFileNameToUniq(&fileNames, &newFileNames, usedOldName, usedNewName)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func scanTempFile(tempFileName string) ([]string, map[string]bool, error) {
 // a						->	temp-123456
 // b						->	c
 // temp-123456	->	b
-func replaceUsedFileNameToUniq(oldFileNames, newFileNames *[]string, usedOldName map[string]int, usedNewName map[string]bool) ([]string, []string, error) {
+func replaceUsedFileNameToUniq(oldFileNames, newFileNames *[]string, usedOldName map[string]int, usedNewName map[string]bool) error {
 	for newIndex, newFileName := range *newFileNames {
 		if oldIndex, ok := usedOldName[newFileName]; ok && newIndex < oldIndex {
 			var tempFineName string
@@ -140,7 +140,7 @@ func replaceUsedFileNameToUniq(oldFileNames, newFileNames *[]string, usedOldName
 				}
 			}
 			if !isUniq {
-				return nil, nil, errors.New("failed to generate uniq file name")
+				return errors.New("failed to generate uniq file name")
 			}
 
 			(*newFileNames)[newIndex] = tempFineName
@@ -148,7 +148,7 @@ func replaceUsedFileNameToUniq(oldFileNames, newFileNames *[]string, usedOldName
 			*newFileNames = append(*newFileNames, newFileName)
 		}
 	}
-	return *oldFileNames, *newFileNames, nil
+	return nil
 }
 
 func genTempFileName(prefix string) string {
@@ -163,6 +163,7 @@ func renameFiles(oldFiles, newFiles []string) error {
 	}
 
 	for i, f := range oldFiles {
+		// fmt.Println(filepath.Join(rootdir, f) + "->" + filepath.Join(rootdir, newFiles[i]))
 		err := os.Rename(filepath.Join(rootdir, f), filepath.Join(rootdir, newFiles[i]))
 		if err != nil {
 			return err
